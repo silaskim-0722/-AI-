@@ -1,8 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "webapp",
+  "name": "inbody-webapp",
+  "main": "dist/_worker.js",
   "compatibility_date": "2025-12-28",
-  "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
   ]
