@@ -406,12 +406,25 @@ function renderMetrics(data) {
 function renderInterpretation(data) {
   const container = document.getElementById('tab-interpretation');
   
+  if (!data.interpretation || !Array.isArray(data.interpretation)) {
+    console.error('Invalid interpretation data:', data.interpretation);
+    container.innerHTML = `
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p class="text-red-700">
+          <i class="fas fa-exclamation-triangle mr-2"></i>
+          해석 데이터를 불러올 수 없습니다.
+        </p>
+      </div>
+    `;
+    return;
+  }
+  
   const cards = data.interpretation.map((item, idx) => `
     <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow">
       <h4 class="text-lg font-semibold text-gray-800 mb-3">
-        <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>${item.title}
+        <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>${item.title || '제목 없음'}
       </h4>
-      <p class="text-gray-700 leading-relaxed">${item.detail}</p>
+      <p class="text-gray-700 leading-relaxed">${item.detail || '내용 없음'}</p>
     </div>
   `).join('');
 
@@ -427,43 +440,71 @@ function renderSolution(data) {
   const container = document.getElementById('tab-solution');
   const solution = data.herbalife_solution;
 
-  // 일일 루틴
-  const routineCards = solution.daily_routine.map(routine => {
-    const items = routine.items.map(item => `
-      <div class="mb-3 pb-3 border-b border-gray-100 last:border-0">
-        <p class="font-semibold text-indigo-700 mb-1">${item.product}</p>
-        <p class="text-sm text-gray-600 mb-1"><strong>이유:</strong> ${item.why}</p>
-        <p class="text-sm text-gray-600"><strong>방법:</strong> ${item.how}</p>
-      </div>
-    `).join('');
-
-    return `
-      <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-        <h4 class="text-lg font-semibold text-gray-800 mb-4">
-          <i class="fas fa-clock mr-2 text-blue-500"></i>${routine.timing}
-        </h4>
-        ${items}
+  if (!solution) {
+    console.error('Missing herbalife_solution data');
+    container.innerHTML = `
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p class="text-red-700">
+          <i class="fas fa-exclamation-triangle mr-2"></i>
+          솔루션 데이터를 불러올 수 없습니다.
+        </p>
       </div>
     `;
-  }).join('');
+    return;
+  }
+
+  // 일일 루틴
+  let routineCards = '';
+  if (solution.daily_routine && Array.isArray(solution.daily_routine)) {
+    routineCards = solution.daily_routine.map(routine => {
+      const items = (routine.items && Array.isArray(routine.items)) ? routine.items.map(item => `
+        <div class="mb-3 pb-3 border-b border-gray-100 last:border-0">
+          <p class="font-semibold text-indigo-700 mb-1">${item.product || '제품명 없음'}</p>
+          <p class="text-sm text-gray-600 mb-1"><strong>이유:</strong> ${item.why || '-'}</p>
+          <p class="text-sm text-gray-600"><strong>방법:</strong> ${item.how || '-'}</p>
+        </div>
+      `).join('') : '<p class="text-gray-500">항목 없음</p>';
+
+      return `
+        <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+          <h4 class="text-lg font-semibold text-gray-800 mb-4">
+            <i class="fas fa-clock mr-2 text-blue-500"></i>${routine.timing || '시간'}
+          </h4>
+          ${items}
+        </div>
+      `;
+    }).join('');
+  } else {
+    routineCards = '<p class="text-gray-500">일일 루틴 데이터가 없습니다.</p>';
+  }
 
   // 체지방 관리
-  const fatCards = solution.fat_management.map(item => `
-    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-3">
-      <p class="font-semibold text-red-800 mb-2">${item.point}</p>
-      <p class="text-sm text-gray-700 mb-2"><strong>실천:</strong> ${item.action}</p>
-      <p class="text-sm text-gray-700"><strong>제품:</strong> ${item.product_suggestion}</p>
-    </div>
-  `).join('');
+  let fatCards = '';
+  if (solution.fat_management && Array.isArray(solution.fat_management)) {
+    fatCards = solution.fat_management.map(item => `
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-3">
+        <p class="font-semibold text-red-800 mb-2">${item.point || '-'}</p>
+        <p class="text-sm text-gray-700 mb-2"><strong>실천:</strong> ${item.action || '-'}</p>
+        <p class="text-sm text-gray-700"><strong>제품:</strong> ${item.product_suggestion || '-'}</p>
+      </div>
+    `).join('');
+  } else {
+    fatCards = '<p class="text-gray-500">체지방 관리 데이터가 없습니다.</p>';
+  }
 
   // 근육/대사 관리
-  const muscleCards = solution.muscle_metabolism.map(item => `
-    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-3">
-      <p class="font-semibold text-green-800 mb-2">${item.point}</p>
-      <p class="text-sm text-gray-700 mb-2"><strong>실천:</strong> ${item.action}</p>
-      <p class="text-sm text-gray-700"><strong>제품:</strong> ${item.product_suggestion}</p>
-    </div>
-  `).join('');
+  let muscleCards = '';
+  if (solution.muscle_metabolism && Array.isArray(solution.muscle_metabolism)) {
+    muscleCards = solution.muscle_metabolism.map(item => `
+      <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-3">
+        <p class="font-semibold text-green-800 mb-2">${item.point || '-'}</p>
+        <p class="text-sm text-gray-700 mb-2"><strong>실천:</strong> ${item.action || '-'}</p>
+        <p class="text-sm text-gray-700"><strong>제품:</strong> ${item.product_suggestion || '-'}</p>
+      </div>
+    `).join('');
+  } else {
+    muscleCards = '<p class="text-gray-500">근육/대사 관리 데이터가 없습니다.</p>';
+  }
 
   container.innerHTML = `
     <div class="space-y-6">
@@ -505,6 +546,19 @@ function renderSolution(data) {
 // 5. 상담 멘트
 function renderScript(data) {
   const container = document.getElementById('tab-script');
+  
+  if (!data.coach_script || !Array.isArray(data.coach_script)) {
+    console.error('Invalid coach_script data:', data.coach_script);
+    container.innerHTML = `
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p class="text-red-700">
+          <i class="fas fa-exclamation-triangle mr-2"></i>
+          상담 멘트 데이터를 불러올 수 없습니다.
+        </p>
+      </div>
+    `;
+    return;
+  }
   
   const sentences = data.coach_script.map((sentence, idx) => `
     <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3">
