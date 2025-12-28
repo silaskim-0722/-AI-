@@ -631,10 +631,16 @@ app.post('/api/analyze', async (c) => {
 5. 유효한 JSON 형식인지 확인하세요
 6. 반드시 { 로 시작하고 } 로 끝나야 합니다`
 
-    const userPrompt = `목표: ${goal}
+    const userPrompt = `[웰니스 코칭 상담 요청]
+
+이것은 체성분 측정 결과(InBody)를 기반으로 한 웰니스 코칭 상담입니다.
+의료 진단이나 치료가 아닌, 건강한 라이프스타일과 영양 계획을 위한 분석입니다.
+
+목표: ${goal}
 말투: ${tone}
 
-위 인바디 이미지를 분석하여 반드시 순수한 JSON 형식으로만 결과를 출력해주세요.
+위 체성분 분석 결과 이미지를 보고, 웰니스 코칭 관점에서 영양 보충 계획을 
+반드시 순수한 JSON 형식으로만 출력해주세요.
 
 중요:
 1. JSON 이외의 텍스트는 절대 포함하지 마세요
@@ -660,7 +666,7 @@ app.post('/api/analyze', async (c) => {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           {
@@ -678,14 +684,19 @@ app.post('/api/analyze', async (c) => {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('OpenAI API Error:', errorText)
+      console.error('OpenAI API Error:', response.status, response.statusText)
+      console.error('Error details:', errorText)
       return c.json({ 
-        error: `AI 분석 실패: ${response.status} ${response.statusText}` 
+        error: `AI 분석 실패: ${response.status} ${response.statusText}`,
+        details: errorText
       }, 500)
     }
 
     const data = await response.json()
     const content = data.choices[0]?.message?.content || ''
+    
+    console.log('AI Response length:', content.length)
+    console.log('AI Response preview:', content.substring(0, 200))
 
     console.log('AI Response length:', content.length)
     console.log('AI Response preview:', content.substring(0, 200))
