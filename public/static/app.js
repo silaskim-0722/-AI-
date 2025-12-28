@@ -165,8 +165,9 @@ function showVerificationScreen(metrics) {
             placeholder="${metric.value || '확인 불가'}"
           />
           <button 
-            onclick="resetMetric(${index}, '${metric.value}')" 
-            class="text-gray-400 hover:text-gray-600"
+            class="reset-metric-btn text-gray-400 hover:text-gray-600"
+            data-index="${index}"
+            data-original="${metric.value || ''}"
             title="원래 값으로 되돌리기"
           >
             <i class="fas fa-undo"></i>
@@ -178,12 +179,21 @@ function showVerificationScreen(metrics) {
     verificationMetrics.innerHTML += metricHTML;
   });
   
+  // 되돌리기 버튼 이벤트 리스너
+  document.querySelectorAll('.reset-metric-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const index = this.dataset.index;
+      const originalValue = this.dataset.original;
+      document.getElementById(`metric-${index}`).value = originalValue;
+    });
+  });
+  
   verificationArea.classList.remove('hidden');
   verificationArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// 수치 리셋
-function resetMetric(index, originalValue) {
+// 수치 리셋 (전역 함수로 유지 - 호환성용)
+window.resetMetric = function(index, originalValue) {
   document.getElementById(`metric-${index}`).value = originalValue;
 }
 
