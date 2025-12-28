@@ -250,11 +250,11 @@ app.post('/api/analyze', async (c) => {
 
     // OpenAI API 호출
     const apiKey = c.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY
-    const baseURL = c.env.OPENAI_BASE_URL || process.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
+    const baseURL = c.env.OPENAI_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
 
     if (!apiKey) {
       return c.json({ 
-        error: 'API 키가 설정되지 않았습니다. GenSpark에서 LLM API 키를 설정해주세요.' 
+        error: 'API 키가 설정되지 않았습니다. OpenAI API 키를 설정해주세요.' 
       }, 500)
     }
 
@@ -265,7 +265,7 @@ app.post('/api/analyze', async (c) => {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-5',
+        model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
           {
