@@ -169,12 +169,22 @@ app.post('/api/analyze', async (c) => {
     const imageUrl = `data:${imageFile.type};base64,${base64Image}`
 
     // 시스템 프롬프트
-    const systemPrompt = `너는 10년 이상 현장에서 수천 명의 고객을 상담한 허벌라이프 프리미어 웰니스 코치이며,
+    const systemPrompt = `[중요: 이 작업은 의료 진단이나 치료 목적이 아닙니다]
+이것은 웰니스 코칭 및 영양 보충제 추천을 위한 체성분 데이터 분석입니다.
+인바디(InBody)는 상용 체성분 분석 기기이며, 이 데이터는 건강한 라이프스타일과 
+영양 계획을 위한 참고 자료로만 사용됩니다.
+
+역할: 너는 10년 이상 현장에서 수천 명의 고객을 상담한 허벌라이프 프리미어 웰니스 코치이며,
 인바디 체성분 분석 전문가이자 영양학 컨설턴트다. 초보 코치들도 전문가처럼 상담할 수 있도록 
 상세하고 실질적인 가이드를 제공한다.
 
 입력: "인바디 결과지 이미지 1장"
-출력: 전문 상담 수준의 상세한 분석 결과 (JSON 형식)
+출력: 웰니스 코칭을 위한 전문 분석 결과 (JSON 형식)
+
+준수사항:
+- 의료 진단, 질병 치료, 처방 관련 내용은 절대 포함하지 않음
+- 건강한 식습관 및 영양 보충 관점으로만 제안
+- 허벌라이프 제품은 영양 보충제로서만 설명
 
 [체성분 분석 전문 원칙]
 1. 수치의 의미를 명확히 설명:
@@ -611,12 +621,27 @@ app.post('/api/analyze', async (c) => {
     {"week":"4주","focus":"정착기: 생활 습관화","checkpoints":["최종 인바디 측정","전후 비교","다음 목표 수립"]}
   ],
   "sms_result": "250-300자 (공백 포함), 이모지 포함, 실제 문자처럼"
-}`
+}
+
+**[최종 중요 지침]**
+1. 위 JSON 구조를 정확히 따르세요
+2. 모든 필드를 빠짐없이 채우세요
+3. JSON 외의 텍스트는 절대 포함하지 마세요
+4. 설명이나 주석을 추가하지 마세요  
+5. 유효한 JSON 형식인지 확인하세요
+6. 반드시 { 로 시작하고 } 로 끝나야 합니다`
 
     const userPrompt = `목표: ${goal}
 말투: ${tone}
 
-위 인바디 이미지를 분석하여 JSON 형식으로 결과를 출력해주세요.`
+위 인바디 이미지를 분석하여 반드시 순수한 JSON 형식으로만 결과를 출력해주세요.
+
+중요:
+1. JSON 이외의 텍스트는 절대 포함하지 마세요
+2. 설명이나 주석을 추가하지 마세요
+3. 반드시 중괄호 { 로 시작하고 } 로 끝나야 합니다
+4. 모든 문자열은 반드시 큰따옴표 " "로 감싸야 합니다
+5. JSON 형식이 유효해야 합니다 (쉼표, 괄호 등 문법 확인)`
 
     // OpenAI API 호출
     const apiKey = c.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY
@@ -662,22 +687,43 @@ app.post('/api/analyze', async (c) => {
     const data = await response.json()
     const content = data.choices[0]?.message?.content || ''
 
-    // JSON 추출 (첫 { 부터 마지막 } 까지)
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
+    console.log('AI Response length:', content.length)
+    console.log('AI Response preview:', content.substring(0, 200))
+
+    // JSON 추출 (여러 방법 시도)
+    let jsonString = ''
+    
+    // 방법 1: ```json 코드 블록 안의 JSON
+    const codeBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/)
+    if (codeBlockMatch) {
+      jsonString = codeBlockMatch[1].trim()
+    } else {
+      // 방법 2: 첫 { 부터 마지막 } 까지
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        jsonString = jsonMatch[0]
+      }
+    }
+
+    if (!jsonString) {
+      console.error('No JSON found in response')
       return c.json({ 
-        error: 'JSON 형식을 찾을 수 없습니다.', 
-        raw_response: content 
+        error: 'AI 응답에서 JSON을 찾을 수 없습니다. 다시 시도해주세요.', 
+        raw_response: content.substring(0, 500)
       }, 500)
     }
 
     try {
-      const result = JSON.parse(jsonMatch[0])
+      const result = JSON.parse(jsonString)
+      console.log('JSON parsed successfully')
       return c.json(result)
     } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      console.error('Failed JSON string preview:', jsonString.substring(0, 500))
       return c.json({ 
-        error: 'JSON 파싱 실패', 
-        raw_response: content 
+        error: 'JSON 파싱 실패. AI 응답 형식이 올바르지 않습니다. 다시 시도해주세요.', 
+        raw_response: content.substring(0, 500),
+        parse_error: parseError instanceof Error ? parseError.message : 'Unknown error'
       }, 500)
     }
 
