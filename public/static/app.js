@@ -1,6 +1,8 @@
 // 전역 변수
 let uploadedImage = null;
 let analysisResult = null;
+let rawAIMetrics = null; // AI가 읽은 원본 수치
+let verifiedMetrics = null; // 사용자가 확인/수정한 수치
 
 // DOM 요소
 const uploadArea = document.getElementById('upload-area');
@@ -11,6 +13,10 @@ const removeImageBtn = document.getElementById('remove-image');
 const analyzeBtn = document.getElementById('analyze-btn');
 const loadingArea = document.getElementById('loading-area');
 const errorArea = document.getElementById('error-area');
+const verificationArea = document.getElementById('verification-area');
+const verificationMetrics = document.getElementById('verification-metrics');
+const confirmMetricsBtn = document.getElementById('confirm-metrics-btn');
+const cancelVerificationBtn = document.getElementById('cancel-verification-btn');
 const resultArea = document.getElementById('result-area');
 const goalSelect = document.getElementById('goal-select');
 const toneSelect = document.getElementById('tone-select');
@@ -95,6 +101,7 @@ analyzeBtn.addEventListener('click', async () => {
     loadingArea.classList.remove('hidden');
     hideError();
     resultArea.classList.add('hidden');
+    verificationArea.classList.add('hidden');
 
     // FormData 생성
     const formData = new FormData();
@@ -114,13 +121,12 @@ analyzeBtn.addEventListener('click', async () => {
       throw new Error(data.error || '분석에 실패했습니다.');
     }
 
-    // 결과 저장 및 렌더링
+    // AI가 읽은 원본 수치 저장
+    rawAIMetrics = data.metrics;
     analysisResult = data;
-    renderResults(data);
-    resultArea.classList.remove('hidden');
 
-    // 결과 영역으로 스크롤
-    resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 수치 확인 화면 표시
+    showVerificationScreen(data.metrics);
 
   } catch (error) {
     console.error('Analysis error:', error);
@@ -129,6 +135,118 @@ analyzeBtn.addEventListener('click', async () => {
     analyzeBtn.disabled = false;
     loadingArea.classList.add('hidden');
   }
+});
+
+// 수치 확인 화면 표시
+function showVerificationScreen(metrics) {
+  verificationMetrics.innerHTML = '';
+  
+  metrics.forEach((metric, index) => {
+    const statusColor = {
+      '정상': 'text-green-600 bg-green-50',
+      '주의': 'text-yellow-600 bg-yellow-50',
+      '개선 필요': 'text-red-600 bg-red-50'
+    }[metric.status] || 'text-gray-600 bg-gray-50';
+    
+    const metricHTML = `
+      <div class="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+        <div class="flex-1">
+          <div class="flex items-center gap-2">
+            <span class="font-medium text-gray-700">${metric.name}</span>
+            <span class="px-2 py-1 rounded text-xs font-medium ${statusColor}">${metric.status}</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <input 
+            type="text" 
+            id="metric-${index}" 
+            value="${metric.value || ''}" 
+            class="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right"
+            placeholder="${metric.value || '확인 불가'}"
+          />
+          <button 
+            onclick="resetMetric(${index}, '${metric.value}')" 
+            class="text-gray-400 hover:text-gray-600"
+            title="원래 값으로 되돌리기"
+          >
+            <i class="fas fa-undo"></i>
+          </button>
+        </div>
+      </div>
+    `;
+    
+    verificationMetrics.innerHTML += metricHTML;
+  });
+  
+  verificationArea.classList.remove('hidden');
+  verificationArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// 수치 리셋
+function resetMetric(index, originalValue) {
+  document.getElementById(`metric-${index}`).value = originalValue;
+}
+
+// 수치 확인 완료
+confirmMetricsBtn.addEventListener('click', async () => {
+  try {
+    // 수정된 수치 수집
+    const updatedMetrics = rawAIMetrics.map((metric, index) => {
+      const inputValue = document.getElementById(`metric-${index}`).value.trim();
+      return {
+        ...metric,
+        value: inputValue || metric.value
+      };
+    });
+    
+    verifiedMetrics = updatedMetrics;
+    
+    // 수정된 수치로 최종 분석 재생성
+    confirmMetricsBtn.disabled = true;
+    confirmMetricsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>최종 분석 생성 중...';
+    
+    // 수정된 데이터로 재분석 요청
+    const response = await fetch('/api/reanalyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        metrics: updatedMetrics,
+        goal: goalSelect.value,
+        tone: toneSelect.value,
+        original_summary: analysisResult.one_line_summary
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || '최종 분석 생성에 실패했습니다.');
+    }
+    
+    // 결과 저장 및 렌더링
+    analysisResult = data;
+    renderResults(data);
+    
+    // UI 전환
+    verificationArea.classList.add('hidden');
+    resultArea.classList.remove('hidden');
+    resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+  } catch (error) {
+    console.error('Reanalysis error:', error);
+    showError(error.message || '최종 분석 생성에 실패했습니다.');
+  } finally {
+    confirmMetricsBtn.disabled = false;
+    confirmMetricsBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>정확합니다. 최종 분석 생성';
+  }
+});
+
+// 수치 확인 취소
+cancelVerificationBtn.addEventListener('click', () => {
+  verificationArea.classList.add('hidden');
+  rawAIMetrics = null;
+  verifiedMetrics = null;
+  analysisResult = null;
 });
 
 // 탭 전환

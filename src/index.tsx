@@ -97,6 +97,30 @@ app.get('/', (c) => {
             <div id="error-area" class="hidden mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"></div>
           </div>
 
+          {/* 수치 확인/수정 영역 */}
+          <div id="verification-area" class="hidden mt-6">
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+              <div class="flex items-start mb-4">
+                <i class="fas fa-exclamation-triangle text-yellow-600 text-2xl mr-3 mt-1"></i>
+                <div>
+                  <h3 class="text-lg font-bold text-yellow-800 mb-2">AI 분석 결과 확인</h3>
+                  <p class="text-sm text-yellow-700">AI가 인바디 이미지에서 읽은 수치입니다. 정확한지 확인하고 필요시 수정해주세요.</p>
+                </div>
+              </div>
+              
+              <div id="verification-metrics" class="space-y-3 mt-4"></div>
+              
+              <div class="flex gap-3 mt-6">
+                <button id="confirm-metrics-btn" class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                  <i class="fas fa-check-circle mr-2"></i>정확합니다. 최종 분석 생성
+                </button>
+                <button id="cancel-verification-btn" class="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors">
+                  <i class="fas fa-times mr-2"></i>취소
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* 결과 영역 */}
           <div id="result-area" class="hidden">
             <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -767,6 +791,127 @@ This is NOT medical diagnosis or treatment. This is a wellness coaching analysis
 
   } catch (error) {
     console.error('Error:', error)
+    return c.json({ 
+      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.' 
+    }, 500)
+  }
+})
+
+// 재분석 API (수정된 수치로)
+app.post('/api/reanalyze', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { metrics, goal, tone, original_summary } = body
+
+    if (!metrics || !Array.isArray(metrics)) {
+      return c.json({ error: '수치 데이터가 없습니다.' }, 400)
+    }
+
+    // 수치를 텍스트로 변환
+    const metricsText = metrics.map(m => `${m.name}: ${m.value} (${m.status})`).join('\n')
+
+    // 시스템 프롬프트 (동일)
+    const systemPrompt = `[IMPORTANT DISCLAIMER]
+This is NOT medical diagnosis or treatment. This is a wellness coaching analysis for nutritional supplement recommendations based on body composition data from a commercial InBody device.
+
+[면책조항 - 웰니스 코칭 목적]
+이 분석은 의료 진단, 질병 치료, 처방이 아닙니다.
+상용 체성분 분석 기기(InBody)의 데이터를 기반으로 한 웰니스 코칭 및 영양 보충제 추천입니다.
+
+역할: 허벌라이프 프리미어 웰니스 코치이자 인바디 체성분 분석 전문가
+
+아래 인바디 수치를 기반으로 웰니스 코칭 분석 결과를 JSON 형식으로 생성하세요.`
+
+    const userPrompt = `[웰니스 코칭 상담 요청 - 정확한 수치 기반]
+
+목표: ${goal}
+말투: ${tone}
+
+인바디 체성분 분석 결과 (사용자 확인 완료):
+${metricsText}
+
+위 수치를 기반으로 웰니스 코칭 분석을 반드시 JSON 형식으로만 출력해주세요.
+
+중요:
+1. 위 수치는 사용자가 확인한 정확한 값입니다
+2. 수치를 변경하지 말고 그대로 사용하세요
+3. JSON 형식으로만 출력하세요
+4. one_line_summary, metrics, interpretation, herbalife_solution, coach_script, guide_4weeks, sms_result 모두 포함`
+
+    const apiKey = c.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY
+    const baseURL = c.env.OPENAI_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
+
+    if (!apiKey) {
+      return c.json({ error: 'API 키가 설정되지 않았습니다.' }, 500)
+    }
+
+    const response = await fetch(`${baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 8000,
+        temperature: 0.8
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('OpenAI API Error:', response.status, response.statusText)
+      console.error('Error details:', errorText)
+      return c.json({ 
+        error: `AI 분석 실패: ${response.status} ${response.statusText}`,
+        details: errorText
+      }, 500)
+    }
+
+    const data = await response.json()
+    const content = data.choices[0]?.message?.content || ''
+    
+    console.log('Reanalysis Response length:', content.length)
+    console.log('Reanalysis Response preview:', content.substring(0, 200))
+
+    // JSON 추출
+    let jsonString = ''
+    
+    const codeBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/)
+    if (codeBlockMatch) {
+      jsonString = codeBlockMatch[1].trim()
+    } else {
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        jsonString = jsonMatch[0]
+      }
+    }
+
+    if (!jsonString) {
+      return c.json({ 
+        error: 'AI 응답에서 JSON을 찾을 수 없습니다.',
+        raw_response: content.substring(0, 500)
+      }, 500)
+    }
+
+    try {
+      const result = JSON.parse(jsonString)
+      console.log('Reanalysis JSON parsed successfully')
+      return c.json(result)
+    } catch (parseError) {
+      return c.json({ 
+        error: 'JSON 파싱 실패.',
+        raw_response: content.substring(0, 500),
+        parse_error: parseError instanceof Error ? parseError.message : 'Unknown error'
+      }, 500)
+    }
+
+  } catch (error) {
+    console.error('Reanalysis Error:', error)
     return c.json({ 
       error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.' 
     }, 500)
