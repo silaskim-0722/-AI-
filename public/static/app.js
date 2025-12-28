@@ -264,6 +264,15 @@ confirmMetricsBtn.addEventListener('click', async () => {
       throw new Error(data.error || '최종 분석 생성에 실패했습니다.');
     }
     
+    // metrics가 누락된 경우 사용자 확인 값으로 채우기
+    if (!data.metrics || !Array.isArray(data.metrics)) {
+      console.warn('API response missing metrics, using verified metrics');
+      data.metrics = verifiedMetrics;
+    }
+    
+    console.log('Final data structure:', data);
+    console.log('Final metrics:', data.metrics);
+    
     // 결과 저장 및 렌더링
     analysisResult = data;
     renderResults(data);
@@ -342,6 +351,20 @@ function renderSummary(data) {
 // 2. 핵심 지표
 function renderMetrics(data) {
   const container = document.getElementById('tab-metrics');
+  
+  // metrics가 없거나 배열이 아닌 경우 에러 처리
+  if (!data.metrics || !Array.isArray(data.metrics)) {
+    console.error('Invalid metrics data:', data.metrics);
+    container.innerHTML = `
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p class="text-red-700">
+          <i class="fas fa-exclamation-triangle mr-2"></i>
+          수치 데이터를 불러올 수 없습니다.
+        </p>
+      </div>
+    `;
+    return;
+  }
   
   const statusColors = {
     '정상': 'bg-green-100 text-green-800',

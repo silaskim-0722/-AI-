@@ -902,7 +902,15 @@ ${metricsText}
 
     try {
       const result = JSON.parse(jsonString)
+      
+      // metrics가 누락된 경우 입력 받은 metrics 그대로 사용
+      if (!result.metrics || !Array.isArray(result.metrics)) {
+        console.warn('AI response missing metrics, using input metrics');
+        result.metrics = metrics;
+      }
+      
       console.log('Reanalysis JSON parsed successfully')
+      console.log('Result metrics:', result.metrics)
       return c.json(result)
     } catch (parseError) {
       return c.json({ 
