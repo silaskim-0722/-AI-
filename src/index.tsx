@@ -812,7 +812,7 @@ app.post('/api/reanalyze', async (c) => {
     // 수치를 텍스트로 변환
     const metricsText = metrics.map(m => `${m.name}: ${m.value} (${m.status})`).join('\n')
 
-    // 시스템 프롬프트 (동일)
+    // 시스템 프롬프트 - 초기 분석과 동일하게 상세하게
     const systemPrompt = `[IMPORTANT DISCLAIMER]
 This is NOT medical diagnosis or treatment. This is a wellness coaching analysis for nutritional supplement recommendations based on body composition data from a commercial InBody device.
 
@@ -822,7 +822,50 @@ This is NOT medical diagnosis or treatment. This is a wellness coaching analysis
 
 역할: 허벌라이프 프리미어 웰니스 코치이자 인바디 체성분 분석 전문가
 
-아래 인바디 수치를 기반으로 웰니스 코칭 분석 결과를 JSON 형식으로 생성하세요.`
+아래 인바디 수치를 기반으로 웰니스 코칭 분석 결과를 JSON 형식으로 생성하세요.
+
+**출력 형식 - 반드시 준수**:
+{
+  "one_line_summary": "전체 요약 한 문장",
+  "metrics": [
+    {"name":"체중","value":"58.2kg","status":"정상"},
+    {"name":"골격근량","value":"22.0kg","status":"정상"},
+    ...7개 항목 모두
+  ],
+  "interpretation": [
+    {"title":"근육량과 기초대사 상태","detail":"상세 설명 3-4문장"},
+    {"title":"체지방 분포와 대사 건강","detail":"상세 설명 3-4문장"},
+    {"title":"체성분 밸런스와 개선 방향","detail":"상세 설명 3-4문장"}
+  ],
+  "herbalife_solution": {
+    "daily_routine": [
+      {"timing":"아침","items":[{"product":"제품명","why":"이유","how":"방법"}]},
+      {"timing":"점심","items":[...]},
+      {"timing":"저녁","items":[...]}
+    ],
+    "fat_management": [
+      {"point":"포인트","action":"실천법","product_suggestion":"제품"}
+    ],
+    "muscle_metabolism": [
+      {"point":"포인트","action":"실천법","product_suggestion":"제품"}
+    ],
+    "compliance_note":"면책 문구"
+  },
+  "coach_script": [
+    "문장1",
+    "문장2",
+    "문장3",
+    "문장4",
+    "문장5"
+  ],
+  "guide_4weeks": [
+    {"week":"1주","focus":"내용","checkpoints":["항목1","항목2"]},
+    {"week":"2주","focus":"내용","checkpoints":["항목1","항목2"]},
+    {"week":"3주","focus":"내용","checkpoints":["항목1","항목2"]},
+    {"week":"4주","focus":"내용","checkpoints":["항목1","항목2"]}
+  ],
+  "sms_result": "250-300자 문자 내용"
+}`
 
     const userPrompt = `[웰니스 코칭 상담 요청 - 정확한 수치 기반]
 
@@ -832,13 +875,20 @@ This is NOT medical diagnosis or treatment. This is a wellness coaching analysis
 인바디 체성분 분석 결과 (사용자 확인 완료):
 ${metricsText}
 
-위 수치를 기반으로 웰니스 코칭 분석을 반드시 JSON 형식으로만 출력해주세요.
-
-중요:
+**지시사항**:
 1. 위 수치는 사용자가 확인한 정확한 값입니다
-2. 수치를 변경하지 말고 그대로 사용하세요
-3. JSON 형식으로만 출력하세요
-4. one_line_summary, metrics, interpretation, herbalife_solution, coach_script, guide_4weeks, sms_result 모두 포함`
+2. metrics 배열에 위 수치를 그대로 사용하세요
+3. 반드시 JSON 형식으로만 출력하세요 (텍스트 설명 없이)
+4. 다음 필드를 모두 포함해야 합니다:
+   - one_line_summary (문자열)
+   - metrics (배열 - 위 수치 그대로)
+   - interpretation (배열 - 3개 항목)
+   - herbalife_solution (객체 - daily_routine, fat_management, muscle_metabolism, compliance_note 포함)
+   - coach_script (배열 - 5-7개 문장)
+   - guide_4weeks (배열 - 4개 주차)
+   - sms_result (문자열 - 250-300자)
+
+**중요**: JSON 시작 { 과 끝 } 만 출력하세요. 설명이나 주석 없이.`
 
     const apiKey = c.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY
     const baseURL = c.env.OPENAI_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
@@ -860,7 +910,7 @@ ${metricsText}
           { role: 'user', content: userPrompt }
         ],
         max_tokens: 8000,
-        temperature: 0.8
+        temperature: 0.5
       })
     })
 
