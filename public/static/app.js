@@ -24,8 +24,10 @@ const toast = document.getElementById('toast');
 const toastMessage = document.getElementById('toast-message');
 
 // 업로드 영역 클릭
-uploadArea.addEventListener('click', () => {
-  if (!uploadedImage) {
+uploadArea.addEventListener('click', (e) => {
+  console.log('Upload area clicked');
+  if (!uploadedImage && e.target !== imageInput) {
+    console.log('Triggering file input click');
     imageInput.click();
   }
 });
@@ -52,10 +54,18 @@ uploadArea.addEventListener('drop', (e) => {
 
 // 파일 선택
 imageInput.addEventListener('change', (e) => {
+  console.log('File input changed');
   const files = e.target.files;
   if (files.length > 0) {
+    console.log('File selected:', files[0].name);
     handleImageUpload(files[0]);
   }
+});
+
+// 파일 입력 직접 클릭 이벤트 (추가 보강)
+imageInput.addEventListener('click', (e) => {
+  console.log('File input directly clicked');
+  e.stopPropagation();
 });
 
 // 이미지 업로드 처리
@@ -117,6 +127,9 @@ analyzeBtn.addEventListener('click', async () => {
 
     const data = await response.json();
 
+    console.log('API Response:', data);
+    console.log('Metrics:', data.metrics);
+
     if (!response.ok) {
       throw new Error(data.error || '분석에 실패했습니다.');
     }
@@ -124,6 +137,9 @@ analyzeBtn.addEventListener('click', async () => {
     // AI가 읽은 원본 수치 저장
     rawAIMetrics = data.metrics;
     analysisResult = data;
+
+    console.log('저장된 rawAIMetrics:', rawAIMetrics);
+    console.log('수치 확인 화면 표시 시작...');
 
     // 수치 확인 화면 표시
     showVerificationScreen(data.metrics);
@@ -139,7 +155,17 @@ analyzeBtn.addEventListener('click', async () => {
 
 // 수치 확인 화면 표시
 function showVerificationScreen(metrics) {
+  console.log('showVerificationScreen 호출됨');
+  console.log('metrics:', metrics);
+  console.log('verificationArea:', verificationArea);
+  console.log('verificationMetrics:', verificationMetrics);
+  
   verificationMetrics.innerHTML = '';
+  
+  if (!metrics || !Array.isArray(metrics)) {
+    console.error('metrics가 배열이 아닙니다:', metrics);
+    return;
+  }
   
   metrics.forEach((metric, index) => {
     const statusColor = {
@@ -179,6 +205,8 @@ function showVerificationScreen(metrics) {
     verificationMetrics.innerHTML += metricHTML;
   });
   
+  console.log('HTML 생성 완료, 이벤트 리스너 등록 중...');
+  
   // 되돌리기 버튼 이벤트 리스너
   document.querySelectorAll('.reset-metric-btn').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -188,8 +216,11 @@ function showVerificationScreen(metrics) {
     });
   });
   
+  console.log('수치 확인 영역 표시 중...');
   verificationArea.classList.remove('hidden');
+  console.log('스크롤 이동 중...');
   verificationArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  console.log('showVerificationScreen 완료!');
 }
 
 // 수치 리셋 (전역 함수로 유지 - 호환성용)

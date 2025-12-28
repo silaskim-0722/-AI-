@@ -42,10 +42,12 @@ app.get('/', (c) => {
             </h2>
             
             <div id="upload-area" class="border-3 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors bg-gray-50">
-              <i class="fas fa-cloud-upload-alt text-5xl text-gray-400 mb-3"></i>
-              <p class="text-gray-600 mb-2">드래그 앤 드롭 또는 클릭하여 파일 선택</p>
-              <p class="text-sm text-gray-500">JPG, PNG 형식 지원</p>
-              <input type="file" id="image-input" accept="image/*" class="hidden" />
+              <div class="pointer-events-none">
+                <i class="fas fa-cloud-upload-alt text-5xl text-gray-400 mb-3"></i>
+                <p class="text-gray-600 mb-2">드래그 앤 드롭 또는 클릭하여 파일 선택</p>
+                <p class="text-sm text-gray-500">JPG, PNG 형식 지원</p>
+              </div>
+              <input type="file" id="image-input" accept="image/*" style="position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;" />
             </div>
 
             <div id="preview-area" class="hidden mt-4">
