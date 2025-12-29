@@ -44,3 +44,4 @@ pids/
 *.bak
 *.tar.gz
 *.zip
+ecosystem.config.cjs

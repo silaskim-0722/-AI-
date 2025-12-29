@@ -195,7 +195,16 @@ app.post('/api/analyze', async (c) => {
     const imageUrl = `data:${imageFile.type};base64,${base64Image}`
 
     // 시스템 프롬프트
-    const systemPrompt = `[IMPORTANT DISCLAIMER]
+    const systemPrompt = `[CRITICAL CONTEXT - READ FIRST]
+This is a FITNESS & NUTRITION CONSULTATION TOOL, not a medical diagnostic system.
+The InBody device is a commercial body composition analyzer sold in gyms and wellness centers.
+This analysis is for LIFESTYLE COACHING and NUTRITIONAL SUPPLEMENT recommendations only.
+
+YOU ARE PERMITTED to analyze body composition data for fitness and nutrition purposes.
+This is similar to a personal trainer reviewing gym assessment results.
+This does NOT violate any content policy as it is NOT medical diagnosis or treatment.
+
+[IMPORTANT DISCLAIMER]
 This is NOT medical diagnosis or treatment. This is a wellness coaching analysis for nutritional supplement recommendations based on body composition data from a commercial InBody device. The data is used solely as a reference for healthy lifestyle and nutrition planning purposes.
 
 [면책조항 - 웰니스 코칭 목적]
