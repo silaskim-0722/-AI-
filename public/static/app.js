@@ -4,6 +4,59 @@ let analysisResult = null;
 let rawAIMetrics = null; // AI가 읽은 원본 수치
 let verifiedMetrics = null; // 사용자가 확인/수정한 수치
 
+// 인바디 표준 범위 (성별 무관 일반 기준)
+const STANDARD_RANGES = {
+  '체중': { min: 45, max: 80, unit: 'kg' }, // 대략적 기준
+  '골격근량': { 
+    check: (value, weight) => {
+      const ratio = (value / weight) * 100;
+      return { min: 35, max: 50, actual: ratio }; // 체중 대비 35-50%
+    }
+  },
+  '체지방량': {
+    check: (value, weight) => {
+      const ratio = (value / weight) * 100;
+      return { min: 0, max: 30, actual: ratio }; // 체중 대비 30% 이하
+    }
+  },
+  '체지방률': { min: 10, max: 28, unit: '%' }, // 남녀 평균
+  'BMI': { min: 18.5, max: 24.9, unit: '' },
+  '복부지방률(WHR)': { min: 0, max: 0.90, unit: '' },
+  '내장지방 레벨': { min: 1, max: 9, unit: '' }
+};
+
+// 수치에서 숫자만 추출
+function extractNumber(value) {
+  if (typeof value === 'number') return value;
+  const match = String(value).match(/[\d.]+/);
+  return match ? parseFloat(match[0]) : null;
+}
+
+// 상태 계산 함수
+function calculateStatus(metricName, value, allMetrics = {}) {
+  const numValue = extractNumber(value);
+  if (numValue === null) return '확인 필요';
+  
+  const range = STANDARD_RANGES[metricName];
+  if (!range) return '정상';
+  
+  // 골격근량/체지방량은 체중 기반 계산
+  if (range.check) {
+    const weight = extractNumber(allMetrics['체중'] || 0);
+    if (!weight) return '정상';
+    
+    const { min, max, actual } = range.check(numValue, weight);
+    if (actual < min) return '개선 필요';
+    if (actual > max) return '주의';
+    return '정상';
+  }
+  
+  // 일반 범위 체크
+  if (numValue < range.min) return '개선 필요';
+  if (numValue > range.max) return '주의';
+  return '정상';
+}
+
 // DOM 요소
 const uploadArea = document.getElementById('upload-area');
 const imageInput = document.getElementById('image-input');
@@ -175,25 +228,28 @@ function showVerificationScreen(metrics) {
     }[metric.status] || 'text-gray-600 bg-gray-50';
     
     const metricHTML = `
-      <div class="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+      <div class="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between" data-metric-index="${index}">
         <div class="flex-1">
           <div class="flex items-center gap-2">
             <span class="font-medium text-gray-700">${metric.name}</span>
-            <span class="px-2 py-1 rounded text-xs font-medium ${statusColor}">${metric.status}</span>
+            <span class="status-badge px-2 py-1 rounded text-xs font-medium ${statusColor}" data-index="${index}">${metric.status}</span>
           </div>
         </div>
         <div class="flex items-center gap-3">
           <input 
             type="text" 
             id="metric-${index}" 
+            data-metric-name="${metric.name}"
+            data-index="${index}"
             value="${metric.value || ''}" 
-            class="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right"
+            class="metric-input w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right"
             placeholder="${metric.value || '확인 불가'}"
           />
           <button 
             class="reset-metric-btn text-gray-400 hover:text-gray-600"
             data-index="${index}"
             data-original="${metric.value || ''}"
+            data-original-status="${metric.status}"
             title="원래 값으로 되돌리기"
           >
             <i class="fas fa-undo"></i>
@@ -207,12 +263,28 @@ function showVerificationScreen(metrics) {
   
   console.log('HTML 생성 완료, 이벤트 리스너 등록 중...');
   
+  // 입력 필드 변경 시 실시간 상태 업데이트
+  document.querySelectorAll('.metric-input').forEach(input => {
+    input.addEventListener('input', function() {
+      updateMetricStatus(this);
+    });
+  });
+  
   // 되돌리기 버튼 이벤트 리스너
   document.querySelectorAll('.reset-metric-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const index = this.dataset.index;
       const originalValue = this.dataset.original;
-      document.getElementById(`metric-${index}`).value = originalValue;
+      const originalStatus = this.dataset.originalStatus;
+      const inputElement = document.getElementById(`metric-${index}`);
+      
+      inputElement.value = originalValue;
+      
+      // 상태 배지도 원래대로
+      const statusBadge = document.querySelector(`.status-badge[data-index="${index}"]`);
+      if (statusBadge) {
+        updateStatusBadge(statusBadge, originalStatus);
+      }
     });
   });
   
@@ -223,6 +295,51 @@ function showVerificationScreen(metrics) {
   console.log('showVerificationScreen 완료!');
 }
 
+// 수치 입력 시 상태 실시간 업데이트
+function updateMetricStatus(inputElement) {
+  const index = inputElement.dataset.index;
+  const metricName = inputElement.dataset.metricName;
+  const newValue = inputElement.value.trim();
+  
+  if (!newValue) return;
+  
+  // 현재 모든 수치를 객체로 수집
+  const currentMetrics = {};
+  document.querySelectorAll('.metric-input').forEach(input => {
+    currentMetrics[input.dataset.metricName] = input.value.trim();
+  });
+  
+  // 새 상태 계산
+  const newStatus = calculateStatus(metricName, newValue, currentMetrics);
+  
+  // 상태 배지 업데이트
+  const statusBadge = document.querySelector(`.status-badge[data-index="${index}"]`);
+  if (statusBadge) {
+    updateStatusBadge(statusBadge, newStatus);
+  }
+}
+
+// 상태 배지 UI 업데이트
+function updateStatusBadge(badge, newStatus) {
+  // 기존 색상 클래스 제거
+  badge.classList.remove(
+    'text-green-600', 'bg-green-50',
+    'text-yellow-600', 'bg-yellow-50',
+    'text-red-600', 'bg-red-50',
+    'text-gray-600', 'bg-gray-50'
+  );
+  
+  // 새 색상 클래스 추가
+  const statusColor = {
+    '정상': ['text-green-600', 'bg-green-50'],
+    '주의': ['text-yellow-600', 'bg-yellow-50'],
+    '개선 필요': ['text-red-600', 'bg-red-50']
+  }[newStatus] || ['text-gray-600', 'bg-gray-50'];
+  
+  badge.classList.add(...statusColor);
+  badge.textContent = newStatus;
+}
+
 // 수치 리셋 (전역 함수로 유지 - 호환성용)
 window.resetMetric = function(index, originalValue) {
   document.getElementById(`metric-${index}`).value = originalValue;
@@ -231,14 +348,27 @@ window.resetMetric = function(index, originalValue) {
 // 수치 확인 완료
 confirmMetricsBtn.addEventListener('click', async () => {
   try {
-    // 수정된 수치 수집
+    // 수정된 수치 수집 + 상태 재계산
+    const currentMetrics = {};
+    document.querySelectorAll('.metric-input').forEach(input => {
+      currentMetrics[input.dataset.metricName] = input.value.trim();
+    });
+    
     const updatedMetrics = rawAIMetrics.map((metric, index) => {
       const inputValue = document.getElementById(`metric-${index}`).value.trim();
+      const newValue = inputValue || metric.value;
+      
+      // 상태 재계산
+      const newStatus = calculateStatus(metric.name, newValue, currentMetrics);
+      
       return {
-        ...metric,
-        value: inputValue || metric.value
+        name: metric.name,
+        value: newValue,
+        status: newStatus
       };
     });
+    
+    console.log('최종 수정된 수치:', updatedMetrics);
     
     verifiedMetrics = updatedMetrics;
     
