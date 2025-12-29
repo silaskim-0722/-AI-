@@ -17,10 +17,28 @@
   - 각 섹션별 복사 기능
 
 ## 📍 URL
-- **개발 서버**: https://3000-isso04whx9nn6o9avgi93-d0b9e1e2.sandbox.novita.ai
-- **API 엔드포인트**: `/api/analyze` (POST)
+- **샌드박스 (개발/테스트)**: https://3000-isso04whx9nn6o9avgi93-d0b9e1e2.sandbox.novita.ai
+- **프로덕션**: https://inbody-webapp.silaskim.workers.dev
+- **GitHub**: https://github.com/silaskim-0722/-AI-
+- **API 엔드포인트**: 
+  - `/api/analyze` (POST) - 초기 이미지 분석
+  - `/api/reanalyze` (POST) - 수치 수정 후 재분석
 
 ## 🎯 완성된 기능
+
+### 0. 인바디 수치 확인 및 실시간 상태 업데이트 ⭐ NEW
+- ✅ AI가 인바디 이미지에서 읽은 수치를 사용자가 확인 가능
+- ✅ 잘못 읽은 수치를 직접 수정 가능
+- ✅ **실시간 상태 재계산**: 수치 입력 시 즉시 '정상/주의/개선 필요' 배지 색상 변경
+  - 체중: 45-80kg
+  - 골격근량: 체중의 35-50%
+  - 체지방량: 체중의 30% 이하
+  - 체지방률: 10-28%
+  - BMI: 18.5-24.9
+  - WHR: 0-0.90
+  - 내장지방: 1-9
+- ✅ 수정된 값으로 최종 분석 재생성
+- ✅ 핵심 지표 탭에서 정확한 상태 표시
 
 ### 1. 전문가 수준 AI 분석 엔진
 - ✅ GPT-4o Vision 모델 (이미지 인식)
